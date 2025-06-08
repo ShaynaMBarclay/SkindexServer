@@ -12,7 +12,6 @@ const PORT = 4000;
 app.use(cors());
 app.use(express.json());
 
-// Initialize GoogleGenerativeAI with API key from .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.post('/analyze', async (req, res) => {
@@ -39,15 +38,15 @@ let text = await result.response.text();
 
 text = text.trim();
 if (text.startsWith("```")) {
-  text = text.replace(/^```(\w*)\n/, ''); // remove starting ```json or ```
-  text = text.replace(/```$/, '');        // remove ending ```
+  text = text.replace(/^```(\w*)\n/, ''); 
+  text = text.replace(/```$/, '');        
 }
 
 const json = JSON.parse(text);
 res.json(json);
   } catch (error) {
     console.error('Gemini Error:', error);
-    res.status(500).json({ error: 'AI failed to process the request.' });
+    res.status(500).json({ error: 'failed to process the request.' });
   }
 });
 
