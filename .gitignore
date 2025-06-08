@@ -4,8 +4,9 @@
 # Environment variables
 .env
 
-# Google Cloud service account keys (JSON)
+# Ignore all JSON files except package.json
 *.json
+!package.json
 
 # Logs
 logs
