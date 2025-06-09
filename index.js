@@ -11,7 +11,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://skindexanalyzer.com',
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -146,5 +151,5 @@ app.post('/send-email', async (req, res) => {
 
 
 app.listen(PORT, () => {
-  console.log(`Server is running on https://theskindexanalyzer.netlify.app/${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
