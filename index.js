@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import nodemailer from 'nodemailer';
+
 
 dotenv.config();
 
@@ -13,6 +15,14 @@ app.use(cors());
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 app.post('/analyze', async (req, res) => {
   const { products } = req.body;
@@ -76,6 +86,61 @@ Return your answer in this JSON format:
   } catch (error) {
     console.error('Gemini Error:', error);
     res.status(500).json({ error: 'failed to process the request.' });
+  }
+});
+
+app.post('/send-email', async (req, res) => {
+  const { email, analysisResult } = req.body;
+
+  if (!email || !analysisResult) {
+    return res.status(400).json({ error: 'Email and analysisResult are required.' });
+  }
+
+  function formatAnalysisToText(result) {
+    let text = "🧴 Your Skincare Analysis Results:\n\n";
+
+    if (result.products) {
+      text += "📦 Products Analysis:\n";
+      result.products.forEach((p) => {
+        text += `- ${p.name}: ${p.description}\n  Usage Time: ${p.usageTime.join(', ')}\n  Frequency: ${p.frequency}\n\n`;
+      });
+    }
+
+    if (result.recommendedRoutine) {
+      text += "🌅 Recommended AM Routine:\n";
+      (result.recommendedRoutine.AM || []).forEach((item, i) => {
+        text += `${i + 1}. ${item}\n`;
+      });
+
+      text += "\n🌙 Recommended PM Routine:\n";
+      (result.recommendedRoutine.PM || []).forEach((item, i) => {
+        text += `${i + 1}. ${item}\n`;
+      });
+    }
+
+    if (result.conflicts && result.conflicts.length > 0) {
+      text += "\n⚠️ Conflicts:\n";
+      result.conflicts.forEach((conflict) => {
+        text += `- ${conflict.products.join(" & ")}: ${conflict.reason}\n`;
+      });
+    }
+
+    return text;
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Your Skincare Products Analysis ✨',
+    text: formatAnalysisToText(analysisResult),
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.json({ message: 'Email sent successfully!' });
+  } catch (err) {
+    console.error('Email sending error:', err);
+    res.status(500).json({ error: 'Failed to send email.' });
   }
 });
 
