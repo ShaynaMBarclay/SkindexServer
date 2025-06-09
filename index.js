@@ -107,7 +107,7 @@ app.post('/send-email', async (req, res) => {
     if (result.products) {
       text += "📦 Products Analysis:\n";
       result.products.forEach((p) => {
-        text += `- ${p.name}: ${p.description}\n  Usage Time: ${p.usageTime.join(', ')}\n  Frequency: ${p.frequency}\n\n`;
+        text += `- ${p.name} ${p.description}\n  Usage Time: ${p.usageTime.join(', ')}\n  Frequency: ${p.frequency}\n\n`;
       });
     }
 
@@ -126,7 +126,7 @@ app.post('/send-email', async (req, res) => {
     if (result.conflicts && result.conflicts.length > 0) {
       text += "\n⚠️ Conflicts:\n";
       result.conflicts.forEach((conflict) => {
-        text += `- ${conflict.products.join(" & ")}: ${conflict.reason}\n`;
+        text += `- ${conflict.products.join(" & ")} ${conflict.reason}\n`;
       });
     }
 
