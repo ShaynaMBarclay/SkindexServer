@@ -12,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: 'http://skindexanalyzer.com',
+  origin: 'https://skindexanalyzer.com',
   methods: ['GET', 'POST'],
   credentials: true
 }));
