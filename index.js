@@ -35,7 +35,9 @@ app.post('/analyze', async (req, res) => {
   const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash-preview-05-20" });
 
   const prompt = `
-You're a licensed esthetician and skincare formulator. A user entered the following skincare products:
+You're a licensed esthetician and skincare formulator.
+ONLY return a valid JSON object. Do NOT include markdown, comments, or extra text.
+ A user entered the following skincare products:
 
 ${products.map((p, i) => `${i + 1}. ${p.name} (${p.type})`).join('\n')}
 
@@ -86,12 +88,20 @@ Return your answer in this JSON format:
     console.log("Raw Gemini response:\n", text);
 
     
-    const json = JSON.parse(text);
-    res.json(json);
-  } catch (error) {
-    console.error('Gemini Error:', error);
-    res.status(500).json({ error: 'failed to process the request.' });
+   let json;
+  try {
+    json = JSON.parse(text);
+  } catch (parseErr) {
+    console.error("JSON parsing error:", parseErr.message);
+    return res.status(500).json({ error: 'Gemini returned invalid JSON. Please try again.' });
   }
+
+  res.json(json);
+} catch (error) {
+  console.error('Gemini Error:', error);
+  res.status(500).json({ error: 'Failed to process the request.' });
+}
+
 });
 
 app.post('/send-email', async (req, res) => {
