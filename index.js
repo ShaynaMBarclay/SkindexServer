@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
 
 dotenv.config();
@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
 
 app.use(cors({
   origin: 'https://skindexanalyzer.com',
@@ -19,15 +20,10 @@ app.use(cors({
 
 app.use(express.json());
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// ===== SendGrid Setup =====
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.post('/analyze', async (req, res) => {
   const { products } = req.body;
@@ -104,12 +100,16 @@ Return your answer in this JSON format:
 
 });
 
+
+// ===== Send Email with SendGrid =====
 app.post('/send-email', async (req, res) => {
   const { email, analysisResult } = req.body;
+  console.log("📨 Email request received:", req.body);
 
   if (!email || !analysisResult) {
     return res.status(400).json({ error: 'Email and analysisResult are required.' });
   }
+
 
   function formatAnalysisToText(result) {
     let text = "🧴 Your Skincare Analysis Results:\n\n";
@@ -143,22 +143,23 @@ app.post('/send-email', async (req, res) => {
     return text;
   }
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
+  
+  const msg = {
     to: email,
+    from: process.env.EMAIL_FROM, 
     subject: 'Your Skincare Products Analysis ✨',
     text: formatAnalysisToText(analysisResult),
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
+    console.log("✅ Email sent via SendGrid");
     res.json({ message: 'Email sent successfully!' });
   } catch (err) {
-    console.error('Email sending error:', err);
+    console.error('❌ SendGrid error:', err.response?.body || err.message);
     res.status(500).json({ error: 'Failed to send email.' });
   }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
