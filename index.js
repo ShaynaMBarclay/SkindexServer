@@ -154,7 +154,7 @@ app.post('/send-email', async (req, res) => {
   try {
     await sgMail.send(msg);
     console.log("✅ Email sent via SendGrid");
-    res.json({ message: 'Email sent successfully!' });
+    res.json({ message: 'Email sent successfully! Please check your spam folder if you do not see it.' });
   } catch (err) {
     console.error('❌ SendGrid error:', err.response?.body || err.message);
     res.status(500).json({ error: 'Failed to send email.' });
