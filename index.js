@@ -112,8 +112,25 @@ Return your answer in this JSON format:
       conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : []
     }));
 
-    // Ensure conflicts array exists
-    if (!Array.isArray(json.conflicts)) json.conflicts = [];
+    // Ensure conflicts array exists and normalize conflicts.products to strings
+    json.conflicts = (json.conflicts || []).map(conflict => {
+      let productsStr = [];
+
+      if (Array.isArray(conflict.products)) {
+        productsStr = conflict.products.map(p => {
+          if (typeof p === 'string') return p;
+          if (p && p.product) return p.product;
+          return JSON.stringify(p);
+        });
+      } else if (typeof conflict.products === 'string') {
+        productsStr = [conflict.products];
+      }
+
+      return {
+        products: productsStr,
+        reason: conflict.reason || "unspecified"
+      };
+    });
 
     // Ensure recommendedRoutine exists
     if (!json.recommendedRoutine) json.recommendedRoutine = { AM: [], PM: [] };
