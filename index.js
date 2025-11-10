@@ -28,17 +28,19 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.post('/analyze', async (req, res) => {
   const { products } = req.body;
 
+  if (!products || !Array.isArray(products) || products.length === 0) {
+    return res.status(400).json({ error: 'Products array is required.' });
+  }
+
   const primaryModel = 'models/gemini-2.5-flash-preview-09-2025';
   const fallbackModel = 'models/gemini-2.5-flash';
 
   let model;
-
   try {
-    // Try primary model first
     model = genAI.getGenerativeModel({ model: primaryModel });
     console.log(`🧠 Using primary model: ${primaryModel}`);
   } catch {
-    console.warn(`⚠️ Primary model failed. Switching to fallback: ${fallbackModel}`);
+    console.warn(`⚠️ Primary model failed. Using fallback: ${fallbackModel}`);
     model = genAI.getGenerativeModel({ model: fallbackModel });
   }
 
@@ -54,7 +56,8 @@ Please return a JSON response that includes:
 1. A description of what each product does.
 2. Whether it should be used in the AM, PM, or both.
 3. How often it should be used (e.g., daily, 2-3x/week).
-4. Any ingredients or product types that should not be used together.
+4. Any ingredients or product types that should not be used together. 
+   - **If there are no conflicts, explicitly return "none" in the conflicts array for that product.**
 5. A recommended usage order for AM and PM routines, skipping products that should not be used at that time.
 
 Return your answer in this JSON format:
@@ -66,7 +69,7 @@ Return your answer in this JSON format:
       "description": "Gently cleanses without stripping skin barrier.",
       "usageTime": ["AM", "PM"],
       "frequency": "daily",
-      "conflictsWith": []
+      "conflictsWith": [] 
     }
   ],
   "recommendedRoutine": {
@@ -82,18 +85,13 @@ Return your answer in this JSON format:
     try {
       result = await model.generateContent(prompt);
     } catch {
-      // Retry once with fallback if the primary model fails
       console.warn(`⚠️ Error using primary model. Retrying with fallback: ${fallbackModel}`);
       const fallback = genAI.getGenerativeModel({ model: fallbackModel });
       result = await fallback.generateContent(prompt);
     }
 
-    let text = await result.response.text();
-    text = text.trim();
-    if (text.startsWith("```")) {
-      text = text.replace(/^```(\w*)\n/, '');
-      text = text.replace(/```$/, '');
-    }
+    let text = (await result.response.text()).trim();
+    if (text.startsWith("```")) text = text.replace(/^```(\w*)\n/, '').replace(/```$/, '');
 
     console.log("Raw Gemini response:\n", text);
 
@@ -102,8 +100,25 @@ Return your answer in this JSON format:
       json = JSON.parse(text);
     } catch (parseErr) {
       console.error("JSON parsing error:", parseErr.message);
-      return res.status(500).json({ error: 'Gemini returned invalid JSON. Please try again.' });
+      return res.status(500).json({ error: 'Gemini returned invalid JSON.' });
     }
+
+    // SAFETY: Ensure every product has conflictsWith
+    json.products = json.products.map(p => ({
+      name: p.name || "Unnamed Product",
+      description: p.description || "",
+      usageTime: Array.isArray(p.usageTime) ? p.usageTime : [],
+      frequency: p.frequency || "",
+      conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : []
+    }));
+
+    // Ensure conflicts array exists
+    if (!Array.isArray(json.conflicts)) json.conflicts = [];
+
+    // Ensure recommendedRoutine exists
+    if (!json.recommendedRoutine) json.recommendedRoutine = { AM: [], PM: [] };
+    if (!Array.isArray(json.recommendedRoutine.AM)) json.recommendedRoutine.AM = [];
+    if (!Array.isArray(json.recommendedRoutine.PM)) json.recommendedRoutine.PM = [];
 
     res.json(json);
 
@@ -112,7 +127,6 @@ Return your answer in this JSON format:
     res.status(500).json({ error: 'Failed to process the request.' });
   }
 });
-
 
 // ===== Send Email with SendGrid =====
 app.post('/send-email', async (req, res) => {
