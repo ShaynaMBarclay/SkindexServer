@@ -28,12 +28,24 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.post('/analyze', async (req, res) => {
   const { products } = req.body;
 
-  const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash-preview-05-20" });
+  const primaryModel = 'models/gemini-2.5-flash-preview-09-2025';
+  const fallbackModel = 'models/gemini-2.5-flash';
+
+  let model;
+
+  try {
+    // Try primary model first
+    model = genAI.getGenerativeModel({ model: primaryModel });
+    console.log(`🧠 Using primary model: ${primaryModel}`);
+  } catch {
+    console.warn(`⚠️ Primary model failed. Switching to fallback: ${fallbackModel}`);
+    model = genAI.getGenerativeModel({ model: fallbackModel });
+  }
 
   const prompt = `
 You're a licensed esthetician and skincare formulator.
 ONLY return a valid JSON object. Do NOT include markdown, comments, or extra text.
- A user entered the following skincare products:
+A user entered the following skincare products:
 
 ${products.map((p, i) => `${i + 1}. ${p.name} (${p.type})`).join('\n')}
 
@@ -55,26 +67,28 @@ Return your answer in this JSON format:
       "usageTime": ["AM", "PM"],
       "frequency": "daily",
       "conflictsWith": []
-    },
-    ...
+    }
   ],
   "recommendedRoutine": {
-    "AM": ["CeraVe Cleanser", "Vitamin C Serum", "Moisturizer", "Sunscreen"],
-    "PM": ["CeraVe Cleanser", "BHA Exfoliant", "Niacinamide Serum", "Moisturizer"]
+    "AM": [],
+    "PM": []
   },
-  "conflicts": [
-    {
-      "products": ["Retinol", "Vitamin C"],
-      "reason": "These ingredients can cause irritation when used together."
-    }
-  ]
+  "conflicts": []
 }
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    let text = await result.response.text();
+    let result;
+    try {
+      result = await model.generateContent(prompt);
+    } catch {
+      // Retry once with fallback if the primary model fails
+      console.warn(`⚠️ Error using primary model. Retrying with fallback: ${fallbackModel}`);
+      const fallback = genAI.getGenerativeModel({ model: fallbackModel });
+      result = await fallback.generateContent(prompt);
+    }
 
+    let text = await result.response.text();
     text = text.trim();
     if (text.startsWith("```")) {
       text = text.replace(/^```(\w*)\n/, '');
@@ -83,21 +97,20 @@ Return your answer in this JSON format:
 
     console.log("Raw Gemini response:\n", text);
 
-    
-   let json;
-  try {
-    json = JSON.parse(text);
-  } catch (parseErr) {
-    console.error("JSON parsing error:", parseErr.message);
-    return res.status(500).json({ error: 'Gemini returned invalid JSON. Please try again.' });
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (parseErr) {
+      console.error("JSON parsing error:", parseErr.message);
+      return res.status(500).json({ error: 'Gemini returned invalid JSON. Please try again.' });
+    }
+
+    res.json(json);
+
+  } catch (error) {
+    console.error('❌ Gemini Error:', error);
+    res.status(500).json({ error: 'Failed to process the request.' });
   }
-
-  res.json(json);
-} catch (error) {
-  console.error('Gemini Error:', error);
-  res.status(500).json({ error: 'Failed to process the request.' });
-}
-
 });
 
 
