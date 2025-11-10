@@ -125,36 +125,41 @@ app.post('/send-email', async (req, res) => {
 
 
   function formatAnalysisToText(result) {
-    let text = "🧴 Your Skincare Analysis Results:\n\n";
+  let text = "🧴 Your Skincare Analysis Results:\n\n";
 
-    if (result.products) {
-      text += "📦 Products Analysis:\n";
-      result.products.forEach((p) => {
-        text += `- ${p.name} ${p.description}\n  Usage Time: ${p.usageTime.join(', ')}\n  Frequency: ${p.frequency}\n\n`;
-      });
-    }
-
-    if (result.recommendedRoutine) {
-      text += "🌅 Recommended AM Routine:\n";
-      (result.recommendedRoutine.AM || []).forEach((item, i) => {
-        text += `${i + 1}. ${item}\n`;
-      });
-
-      text += "\n🌙 Recommended PM Routine:\n";
-      (result.recommendedRoutine.PM || []).forEach((item, i) => {
-        text += `${i + 1}. ${item}\n`;
-      });
-    }
-
-    if (result.conflicts && result.conflicts.length > 0) {
-      text += "\n⚠️ Conflicts:\n";
-      result.conflicts.forEach((conflict) => {
-        text += `- ${conflict.products.join(" & ")} ${conflict.reason}\n`;
-      });
-    }
-
-    return text;
+  if (result.products) {
+    text += "📦 Products Analysis:\n";
+    result.products.forEach((p) => {
+      const usageTime = Array.isArray(p.usageTime) ? p.usageTime.join(', ') : "unspecified";
+      const frequency = p.frequency || "unspecified";
+      text += `- ${p.name} ${p.description}\n  Usage Time: ${usageTime}\n  Frequency: ${frequency}\n\n`;
+    });
   }
+
+  if (result.recommendedRoutine) {
+    text += "🌅 Recommended AM Routine:\n";
+    (result.recommendedRoutine.AM || []).forEach((item, i) => {
+      text += `${i + 1}. ${item}\n`;
+    });
+
+    text += "\n🌙 Recommended PM Routine:\n";
+    (result.recommendedRoutine.PM || []).forEach((item, i) => {
+      text += `${i + 1}. ${item}\n`;
+    });
+  }
+
+  if (result.conflicts && result.conflicts.length > 0) {
+    text += "\n⚠️ Conflicts:\n";
+    result.conflicts.forEach((conflict) => {
+      const products = Array.isArray(conflict.products) ? conflict.products.join(" & ") : "unknown";
+      const reason = conflict.reason || "unspecified";
+      text += `- ${products} ${reason}\n`;
+    });
+  }
+
+  return text;
+}
+
 
   
   const msg = {
