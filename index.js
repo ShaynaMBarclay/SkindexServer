@@ -103,7 +103,6 @@ Return your answer in this JSON format:
       return res.status(500).json({ error: 'Gemini returned invalid JSON.' });
     }
 
-    // SAFETY: Ensure every product has conflictsWith
     json.products = json.products.map(p => ({
       name: p.name || "Unnamed Product",
       description: p.description || "",
@@ -112,26 +111,29 @@ Return your answer in this JSON format:
       conflictsWith: Array.isArray(p.conflictsWith) ? p.conflictsWith : []
     }));
 
-    // Ensure conflicts array exists and normalize conflicts.products to strings
-    json.conflicts = (json.conflicts || []).map(conflict => {
-      let productsStr = [];
 
-      if (Array.isArray(conflict.products)) {
-        productsStr = conflict.products.map(p => {
-          if (typeof p === 'string') return p;
-          if (p && p.product) return p.product;
-          return JSON.stringify(p);
-        });
-      } else if (typeof conflict.products === 'string') {
-        productsStr = [conflict.products];
-      }
+   json.conflicts = (json.conflicts || []).map(conflict => {
+  let products = [];
 
-      return {
-        products: productsStr,
-        reason: conflict.reason || "unspecified"
-      };
-    });
+  if (Array.isArray(conflict.products)) {
+    products = conflict.products;
+  } else if (Array.isArray(conflict.items)) {
+    products = conflict.items;
+  } else if (conflict.productA && conflict.productB) {
+    products = [conflict.productA, conflict.productB];
+  } else if (typeof conflict.products === "string") {
+    products = [conflict.products];
+  }
 
+  return {
+    products,
+    reason:
+      conflict.reason ||
+      conflict.explanation ||
+      conflict.description ||
+      "unspecified"
+  };
+});
     // Ensure recommendedRoutine exists
     if (!json.recommendedRoutine) json.recommendedRoutine = { AM: [], PM: [] };
     if (!Array.isArray(json.recommendedRoutine.AM)) json.recommendedRoutine.AM = [];
@@ -144,6 +146,7 @@ Return your answer in this JSON format:
     res.status(500).json({ error: 'Failed to process the request.' });
   }
 });
+
 
 // ===== Send Email with SendGrid =====
 app.post('/send-email', async (req, res) => {
